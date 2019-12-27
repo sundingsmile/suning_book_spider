@@ -18,14 +18,6 @@ class TestSpider(scrapy.Spider):
 
     # 提取书的详细URL信息
     def parse_class_url(self,response):
-        print('*' * 100)
-        print(response.url)
-        book_list = response.css('#filter-results li')
-        print('每一页有{}本书'.format(len(book_list)))
-        for temp in book_list:
-            book_url= 'https:' + temp.css('.res-info a::attr(href)').extract_first()
-            yield scrapy.Request(book_url,callback=self.parse_book_info)
-
         # 获取总页数
         if re.findall('共(\d+)页，到第',response.text) == []:
             # print('-' * 100)
@@ -36,46 +28,65 @@ class TestSpider(scrapy.Spider):
         else:
             page_num = int(re.findall('共(\d+)页，到第',response.text)[0])
 
-        # 翻译地址模板
-        next_url_temp1 = 'https://list.suning.com/emall/showProductList.do?ci={}&pg=03&cp={}&il=0&iy=0&adNumber=0&n=1&ch=4&prune=0&sesab=ACBAABC&id=IDENTIFYING&cc=311'
-        next_url_temp2 = 'https://search.suning.com/emall/searchProductList.do?keyword={}&ci=0&pg=01&cp={}&il=1&st=0&iy=0&adNumber=0&n=1&ch=4&sesab=ACAABAABCAAA&id=IDENTIFYING&cc=311'
+        # 翻页地址模板
+        if response.url.find('keyword') == -1:
+            book_list_front_half = 'https://list.suning.com/emall/showProductList.do?ci={}&pg=03&cp={}&il=0&iy=0&adNumber=0&n=1&ch=4&prune=0&sesab=ACBAABC&id=IDENTIFYING&cc=010'
+            book_list_back_half = 'https://list.suning.com/emall/showProductList.do?ci={}&pg=03&cp={}&il=0&iy=0&adNumber=0&n=1&ch=4&prune=0&sesab=ACBAABC&id=IDENTIFYING&cc=010&paging=1&sub=0'
+        else:
+            book_list_front_half = 'https://search.suning.com/emall/searchProductList.do?keyword={}&ci=0&pg=01&cp={}&il=1&st=0&iy=0&adNumber=0&n=1&ch=4&sesab=ACAABAABCAAA&id=IDENTIFYING&cc=010'
+            book_list_back_half = 'https://search.suning.com/emall/searchProductList.do?keyword={}&ci=0&pg=01&cp={}&il=1&st=0&iy=0&adNumber=0&n=1&ch=4&sesab=ACAABAABCCAA&id=IDENTIFYING&cc=010&paging=1&sub= 0'
         # 获取书的分类id
-        book_class_id = re.findall('"categoryId": "(\d)+",',response.text)[0]
-
+        book_class_id = re.findall('"categoryId": "(\d+)",',response.text)[0]
+        print('*' * 100)
+        print(response.url)
         print('总页数{}'.format(page_num))
+        print('书类ID为{}'.format(book_class_id))
+
         # 翻页
-        for i in range(1,page_num + 1,1):
-            # print('-' * 100)
-            # print('总页数{}'.format(page_num))
-            # print('这是第{}页'.format(i))
-            # print('-' * 100)
-            if response.css('#nextPage'):
-                next_page_url = next_url_temp1.format(book_class_id,i)
-                yield scrapy.Request(
-                    next_page_url,
-                    callback=self.parse_next_page
-                )
-            else:
-                next_page_url = next_url_temp2.format(book_class_id,i)
-                yield scrapy.Request(
-                    next_page_url,
-                    callback=self.parse_next_page
-                )
+        for i in range(0,page_num + 1,1):
+            print('翻页中')
+            next_page_fron_url = book_list_front_half.format(book_class_id,i)
+            print('nextPage', i)
+            print(next_page_fron_url)
+            yield scrapy.Request(
+                next_page_fron_url,
+                callback=self.parse_book_url
+            )
+            next_page_back_url = book_list_back_half.format(book_class_id,i)
+            print('nextPage', i)
+            print(next_page_back_url)
+            yield scrapy.Request(
+                next_page_back_url,
+                callback=self.parse_book_url
+            )
 
     # 获取下一页中书的详细信息
-    def parse_next_page(self,response):
-        print('提取数据中')
-        book_list = response.css('#filter-results li')
-        for temp in book_list:
-            book_url = 'https:' + temp.css('.res-info a::attr(href)').extract_first()
-            yield scrapy.Request(book_url, callback=self.parse_book_info)
+    def parse_book_url(self,response):
+        if response.url.find('paging') != -1:
+            book_list = response.css('li')
+            print('paging',len(book_list))
+            for temp in book_list:
+                book_url = 'https:' + temp.css('.res-info a::attr(href)').extract_first()
+                print('-' * 100)
+                print('book_url:',book_url)
+                yield scrapy.Request(book_url, callback=self.parse_book_info)
+        else:
+            book_list = response.css('#filter-results li')
+            print('not paging',len(book_list))
+            for temp in book_list:
+                book_url = 'https:' + temp.css('.res-info a::attr(href)').extract_first()
+                print('-' * 100)
+                print('book_url:',book_url)
+                yield scrapy.Request(book_url, callback=self.parse_book_info)
 
 
     # 提取书的详细信息
     def parse_book_info(self,response):
-        # print('提取详细信息中')
         items = {}
-        items['book_info'] = re.sub('\s','',response.xpath('//h1[@id="itemDisplayName"]/text()').extract_first())
+        try:
+            items['book_info'] = re.sub('\s','',response.xpath('//h1[@id="itemDisplayName"]/text()').extract()[1])
+        except:
+            items['book_info'] = ''
         items['book_price'] = re.findall('"itemPrice":"(.*?)"',response.text)[0]
         items['book_author'] = re.sub('\s','',response.css('#proinfoMain li:nth-child(1)::text').extract_first())
         try:
@@ -86,5 +97,5 @@ class TestSpider(scrapy.Spider):
             items['book_publish_time'] = re.sub('\s','',response.css('#proinfoMain  li:nth-child(3) span:nth-child(2)::text').extract_first())
         except Exception as e:
             items['book_publish_time'] = ''
-        # print(items)
+        print(items)
         yield items
