@@ -44,17 +44,17 @@ class TestSpider(scrapy.Spider):
 
         # 翻页
         for i in range(0,page_num + 1,1):
-            print('翻页中')
+            # print('翻页中')
             next_page_fron_url = book_list_front_half.format(book_class_id,i)
-            print('nextPage', i)
-            print(next_page_fron_url)
+            # print('nextPage', i)
+            # print(next_page_fron_url)
             yield scrapy.Request(
                 next_page_fron_url,
                 callback=self.parse_book_url
             )
             next_page_back_url = book_list_back_half.format(book_class_id,i)
-            print('nextPage', i)
-            print(next_page_back_url)
+            # print('nextPage', i)
+            # print(next_page_back_url)
             yield scrapy.Request(
                 next_page_back_url,
                 callback=self.parse_book_url
@@ -64,19 +64,23 @@ class TestSpider(scrapy.Spider):
     def parse_book_url(self,response):
         if response.url.find('paging') != -1:
             book_list = response.css('li')
-            print('paging',len(book_list))
+            if len(book_list) == 0:
+                print('-' * 100)
+                print('URL：',response.url)
             for temp in book_list:
                 book_url = 'https:' + temp.css('.res-info a::attr(href)').extract_first()
-                print('-' * 100)
-                print('book_url:',book_url)
+                # print('-' * 100)
+                # print('book_url:',book_url)
                 yield scrapy.Request(book_url, callback=self.parse_book_info)
         else:
             book_list = response.css('#filter-results li')
-            print('not paging',len(book_list))
+            if len(book_list) == 0:
+                print('#' * 100)
+                print('URL：',response.url)
             for temp in book_list:
                 book_url = 'https:' + temp.css('.res-info a::attr(href)').extract_first()
-                print('-' * 100)
-                print('book_url:',book_url)
+                # print('-' * 100)
+                # print('book_url:',book_url)
                 yield scrapy.Request(book_url, callback=self.parse_book_info)
 
 
@@ -87,7 +91,10 @@ class TestSpider(scrapy.Spider):
             items['book_info'] = re.sub('\s','',response.xpath('//h1[@id="itemDisplayName"]/text()').extract()[1])
         except:
             items['book_info'] = ''
-        items['book_price'] = re.findall('"itemPrice":"(.*?)"',response.text)[0]
+        try:
+            items['book_price'] = re.findall('"itemPrice":"(.*?)"',response.text)[0]
+        except:
+            items['book_price'] = 'No price for now'
         items['book_author'] = re.sub('\s','',response.css('#proinfoMain li:nth-child(1)::text').extract_first())
         try:
             items['book_publisher'] = re.sub('\s','',response.css('#proinfoMain li:nth-child(2)::text').extract_first())
