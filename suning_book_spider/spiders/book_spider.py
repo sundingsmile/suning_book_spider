@@ -90,7 +90,7 @@ class TestSpider(scrapy.Spider):
         try:
             items['book_info'] = re.sub('\s','',response.xpath('//h1[@id="itemDisplayName"]/text()').extract()[1])
         except:
-            items['book_info'] = ''
+            items['book_info'] = 'unknown'
         try:
             items['book_price'] = re.findall('"itemPrice":"(.*?)"',response.text)[0]
         except:
@@ -99,10 +99,10 @@ class TestSpider(scrapy.Spider):
         try:
             items['book_publisher'] = re.sub('\s','',response.css('#proinfoMain li:nth-child(2)::text').extract_first())
         except:
-            items['book_publisher'] = ''
+            items['book_publisher'] = 'unknown'
         try:
             items['book_publish_time'] = re.sub('\s','',response.css('#proinfoMain  li:nth-child(3) span:nth-child(2)::text').extract_first())
         except Exception as e:
-            items['book_publish_time'] = ''
+            items['book_publish_time'] = 'unknown'
         print(items)
         yield items
