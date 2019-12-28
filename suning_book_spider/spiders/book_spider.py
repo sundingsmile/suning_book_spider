@@ -94,7 +94,7 @@ class TestSpider(scrapy.Spider):
         try:
             items['book_price'] = re.findall('"itemPrice":"(.*?)"',response.text)[0]
         except:
-            items['book_price'] = 'No price for now'
+            items['book_price'] = 'unknown'
         items['book_author'] = re.sub('\s','',response.css('#proinfoMain li:nth-child(1)::text').extract_first())
         try:
             items['book_publisher'] = re.sub('\s','',response.css('#proinfoMain li:nth-child(2)::text').extract_first())
